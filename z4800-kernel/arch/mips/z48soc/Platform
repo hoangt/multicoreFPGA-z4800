@@ -1,0 +1,6 @@
+#
+# Z4800 SoC
+#
+platform-$(CONFIG_MACH_Z48SOC)	+= z48soc/
+cflags-$(CONFIG_MACH_Z48SOC)	+= -I$(srctree)/arch/mips/include/asm/mach-z48soc
+load-$(CONFIG_MACH_Z48SOC)	+= 0xffffffff80002000

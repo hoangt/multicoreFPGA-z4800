@@ -1,0 +1,125 @@
+\documentclass{article}
+\usepackage{html}
+\usepackage{hyperref}
+\usepackage{tabularx}
+\usepackage[top=0.75in,bottom=0.75in,left=1.25in,right=1.25in]{geometry}
+\usepackage{array}
+\usepackage{graphics}
+\hypersetup{
+   pdfinfo={ %
+      Title={Z4800 Documentation} %
+   }, %
+   bookmarks=true,         % show bookmarks bar?
+   unicode=false,          % non-Latin characters in Acrobat’s bookmarks
+   pdftoolbar=true,        % show Acrobat’s toolbar?
+   pdfmenubar=true,        % show Acrobat’s menu?
+   pdffitwindow=true,      % window fit to page when opened
+   pdfnewwindow=true,      % links in new window
+   colorlinks=true,        % false: boxed links; true: colored links
+   linkcolor=blue,         % color of internal links
+   citecolor=green,        % color of links to bibliography
+   filecolor=blue,         % color of file links
+   urlcolor=blue           % color of external links
+}
+
+\newcommand{\intref}[2]{%
+   \latexhtml{%
+      \hyperlink{#1}{#2 (\S\ref*{#1}, p.\pageref*{#1})}%
+   }%
+   {%
+      \htmlref{#2}{#1}%
+   }%
+}
+
+\newcommand{\quotes}[1]{\latexhtml{``#1''}{"#1"}}
+\newcommand{\tm}{\latexhtml{\texttrademark}{\begin{rawhtml}&\#8482;\end{rawhtml}}}
+\newcommand{\rtm}{\latexhtml{\textregistered}{\begin{rawhtml}&reg;\end{rawhtml}}}
+
+\title{Z4800 Platform Documentation}
+\author{Will Simoneau}
+
+\begin{document}
+\maketitle
+
+\begin{rawhtml}
+<div id="author_hack"></div>
+\end{rawhtml}
+
+The Z4800 platform is an open-source (mostly GPLv2) project consisting of a
+synthesizable soft-core CPU plus supporting hardware and software. The included
+reference designs allow construction of a complete FPGA computer complemented
+by a full-featured operating system capable of running many real-world
+programs. This platform can be used for many purposes, particularly benchmark
+studies; the processor core can be modified and has an extendable performance
+counter system.
+
+The Z4800 CPU itself is a clean-room design capable of executing some binaries
+compiled for a variant of the MIPS\rtm{} R4000\tm{} processor. The main
+differences are that it does not implement the 64-bit or floating-point
+instructions, and that its native endianness is little-endian.  Aside from
+these differences, most existing user-mode and kernel-mode software will work.
+
+A fully functional Linux kernel is supported; source code for the modified
+kernel is included. These modifications are mostly to support the peripherals
+on the FPGA boards -- the Z4800 CPU functions enough like an R4K that the
+existing Linux/mips R4K code can be used directly. SMP (multiprocessor) support
+is included.
+
+To download the complete Z4800 source code, run the following command. You will
+need at least Git 1.5.3 because this project uses submodules.
+\begin{verbatim}
+git clone --recursive git://trogdor.ele.uri.edu/z4800.git
+\end{verbatim}
+
+A paper about this project,
+\htmladdnormallink{%
+      \emph{%
+         An FPGA-based Multi-Core Platform for Testing and Analysis of
+         Architectural Techniques%
+      }%
+   }%
+   {http://www.ele.uri.edu/~simoneau/ispass2012.pdf}%
+, was written for and accepted to the
+\emph{%
+   \htmladdnormallink{%
+      2012 IEEE International Symposium on Performance Analysis of Systems
+      and Software%
+   }%
+   {http://ispass.org/ispass2012}%
+}.
+
+\smallskip
+
+\subsection{To-Do List}
+In no particular order:
+\begin{itemize}
+\item Publish public documentation on the Z4800 CPU internals
+\item Add screenshots to the documentation to show example output
+\item Create and publish virtual machine images providing a canned development environment
+\item Create and publish tarball providing a canned root-FS for target board (DE2-115, etc.)
+\item Publish public version of benchmarking infrastructure, with accompanying documentation
+\end{itemize}
+
+\subsection{Legal Notice}
+{
+   \footnotesize
+   MIPS and R4000 are trademarks or registered trademarks of MIPS Technologies,
+   Inc. in the United States and other countries. The Z4800 project is neither
+   licensed by nor endorsed in any way by MIPS Technologies, Inc. We only claim
+   to have limited binary compatibility; we claim neither full compatibility
+   nor full compliance with any MIPS\rtm{} products and/or specifications.
+}
+
+\subsection{Contacts}
+
+The author of the Z4800 source code is Will Simoneau
+(\htmladdnormallink{simoneau@ele.uri.edu}{mailto:simoneau@ele.uri.edu}). He may
+be contacted for any technical questions.
+The ISPASS 2012 paper was co-authored with \htmladdnormallink{Resit
+Sendag}{http://www.ele.uri.edu/faculty/sendag/}
+(\htmladdnormallink{sendag@ele.uri.edu}{mailto:sendag@ele.uri.edu}).
+
+\input{sec_dev_env}
+\input{sec_files}
+
+\end{document}

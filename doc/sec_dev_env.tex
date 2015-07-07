@@ -1,0 +1,229 @@
+\section{Building \& Booting}
+
+The most complicated part of using the Z4800 design is setting up a working
+development environment for it. Many pieces of software need to work together
+for the developer (\emph{you}) to accomplish anything useful.  Setting up such
+an environment is no small task; doing so from scratch is extremely difficult
+for a new developer. The goal of this section is to guide you through setting
+everything up, to the point where you should be able to compile the reference
+board designs and software from scratch and demonstrate them functioning on
+real FPGA boards.
+
+The environment was designed for Linux hosts. It should be possible to develop
+on Windows using \htmladdnormallink{Cygwin}{http://www.cygwin.com}, but we
+haven't tried constructing such an environment.  If your host absolutely must
+run Windows, you will need to install Linux
+(\htmladdnormallink{Debian}{http://www.debian.org}, etc.) inside of
+\htmladdnormallink{VirtualBox}{http://www.virtualbox.org} and develop on the
+VM.
+
+\subsection{Altera Software}
+
+You'll need \intref{sec:files}{Altera's Quartus II software}. Version 11.0sp1
+should work. Run their Linux installers and get it set up.
+
+\subsection{GNU mipsel Toolchain}
+\label{subsec:toolchain}
+
+The Z4800 CPU can run code compiled for a 32-bit only, little-endian variant of
+the R4K. GNU binutils and GCC can provide the minimal cross-toolchain you'll
+need to compile the bootloaders and Linux kernel. You'll need to compile these
+yourself; this section covers how to do that. We will be targetting
+\verb+mipsel-unknown-linux-gnu+.
+
+You will need to install some dependencies to be able to compile these. On
+Debian Stable (as of this writing, Debian \quotes{Squeeze}), you will need to
+do the following:
+\begin{verbatim}
+# apt-get install build-essential libgmp3-dev libmpfr-dev libmpc-dev
+\end{verbatim}
+
+\subsubsection{binutils}
+
+The first piece of the puzzle is a cross-binutils. Download the
+\intref{sec:files}{binutils source} and get it installed. The final command
+requires root access if you use the default installation paths, since it will
+be installing to \verb+/usr/local+.
+\begin{verbatim}
+$ tar xvjf binutils-2.20.1.tar.bz2
+$ cd binutils-2.20.1
+$ ./configure --target=mipsel-unknown-linux-gnu
+$ make
+$ sudo make install
+\end{verbatim}
+
+\subsubsection{GCC}
+
+Now we need a cross-compiler, so get the \intref{sec:files}{GCC source}. We
+don't need to cross-compile userland binaries so we don't need any external
+headers, and just a basic C compiler will do. GCC does not like being built in
+its own source directory; you need to create a separate build directory for it.
+
+\begin{verbatim}
+$ tar xvjf gcc-4.5.3.tar.bz2
+$ cd gcc-4.5.3
+$ mkdir build
+$ cd build
+$ ../configure --target=mipsel-unknown-linux-gnu --without-headers \
+  --without-threads --enable-languages=c
+$ make
+$ sudo make install
+\end{verbatim}
+
+\subsection{CPU Boot Code}
+
+At this point you should have a functional cross-compilation environment, and
+should be able to successfully issue \verb+make+ in \verb+core/boot+ in the
+Z4800 git tree. This will build the bootloader(s) which will be embedded into
+the FPGA's on-chip ROMs. If this does not work, something is not set up
+correctly.  Usually the problem is that your new binutils, GCC, or the Altera
+NIOS tools (particularly \verb+elf2hex+) are not in your \$PATH.
+
+\subsection{Generate SOPC Files}
+
+Next, you need to open the Quartus project (example:
+\verb+core/projects/de2_115_smp/prj_de2_115_smp.qpf+) in Quartus. Go to the
+\quotes{Tools} menu and run \quotes{SOPC Builder}. (Or run \verb+sopc_builder+
+from the project's directory.)
+
+The first time you use SOPC Builder with any Z4800 project, you will need to
+add the right directory to the IP search path. In SOPC Builder, go to
+\quotes{Tools}, \quotes{Options}, select \quotes{IP Search Path}, and add the
+\verb+core/hdl+ directory (which is a subdirectory of wherever you left the
+checked-out git repository). This should result in \verb+core/hdl/**/*+ being
+searched, which should pick up all the custom SOPC Builder modules.
+
+Now you can open the SOPC Builder system file for the project (example:
+\verb+sys_de2_115_smp.sopc+). If everything goes well, no errors should be
+listed. If that's the case, hit Generate and wait until it finishes
+successfully. This can take a couple minutes depending on your workstation's
+hardware.
+
+\subsection{Compile Project in Quartus}
+
+Now that all the relevant files are generated, you can compile the Quartus
+project itself. Click \quotes{Processing}, \quotes{Start Complation}. If there
+are no errors, this will take from several minutes to a few hours, depending on
+your workstation's hardware. (You could also do this without using the Quartus
+GUI: \verb+quartus_sh --flow compile project_name+ from inside the project's
+directory.)
+
+When compilation is complete, you will have a .sof file in the project
+directory (example:
+\verb+core/projects/de2_115_smp/prj_de2_115_smp_time_limited.sof+). This is the
+bitstream image of the completed design, ready to be used to program the FPGA.
+
+\subsection{Kernel, OS, and NFS-root Hints}
+
+If you got this far successfully, the next part you need to build is the
+target's Linux kernel. An example kernel .config is provided in the board's
+directory (\verb+kernel.config+). You will probably need to adjust
+\verb+CONFIG_CMDLINE+, as it hardcodes the network configuration for NFS-root.
+
+You can build the kernel from the board directory using a command such as the
+following, which will put object files (and the final \verb+vmlinux+ ELF
+binary) into the \verb+kobj+ subdirectory.
+
+\begin{verbatim}
+$ mkdir kobj
+$ make -C ../../kernel KCONFIG_CONFIG=../kernel.config ARCH=mips \
+  CROSS_COMPILE=mipsel-unknown-linux-gnu- O=../projects/de2_115_smp/kobj \
+  vmlinux
+\end{verbatim}
+
+\subsubsection{Target OS}
+
+You will need to have a local NFS server prepared; I suggest serving a Debian
+install. To set up this directory with a usable root filesystem, you can use
+the \verb+debootstrap+ or \verb+cdebootstrap+ tools. The key to using these is
+the \verb+--foreign+ option, which permits bootstrapping on architectures other
+than that of the host machine. You will need to refer to the tools'
+documentation and think about your network setup to finish this step. Make sure
+your NFS server is properly exporting the directory which will become the
+target's root filesystem.
+
+It can be helpful to use \htmladdnormallink{QEMU}{http://www.qemu.org} to
+emulate a somewhat generic MIPS machine and bootstrap the OS before attempting
+to boot an FPGA; how you accomplish this is up to you. Either way, by doing it
+yourself you will become familiar with how things work.
+
+\subsubsection{Booting the Target}
+
+The target board needs a way to load its kernel. It is possible to boot kernels
+out of Flash memory (\verb+core/boot/boot_cfi.S+ is a minimal bootloader for
+CFI Flash written in assembly), but that requires one to program the kernel
+onto the Flash chip, creating a chicken-and-egg problem. Instead, you can use a
+second board to control the target board and load its kernel. In this example
+we will pair a DE2-70 debugger board with a DE2-115 target containing the Z4800
+CPU(s).
+
+You will need to make a custom ribbon cable to safely connect the two FPGA
+boards. Start with a 40-pin ribbon with one connector at each end, about 8-10
+inches long (a 40-pin single-disk IDE ribbon could work). \emph{You MUST remove
+two wires from the ribbon: those connecting to pin 11 and pin 29.} These wires
+connect to the FPGA's power rails; it is inadvisable to short the two boards'
+power rails together. If you get this wrong, it may destroy the boards -- you
+have been warned. Be very careful with the pinout, and refer to both the DE2-70
+and DE2-115 manuals to be sure your connection is correct before powering
+anything on.
+
+Use this ribbon cable to connect the DE2-70 to the DE2-115; either of the
+DE2-70's GPIO headers may be used. If you connect to GPIO0 (the left one), set
+SW17 down; if you connect to GPIO1 set SW17 up (there is a bus \quotes{switch}
+connecting the remote-DMA module to either header).
+
+Now that the boards are connected, power on only the DE2-70, and program the
+\verb+core/projects/de2_70_debugger/de2_70_debugger.sof+
+file onto it. Then, power on the DE2-115 and program it. Press and hold KEY0
+(reset) on both boards simultaneously to ensure the link state is sane; LEDG0
+through LEDG3 on both boards should be OFF if it is working correctly.
+
+Attach a straight-through DB9 serial cable to the DE2-70's serial port. Run
+minicom to get a console for the DE2-70 (the serial parameters it uses are
+115200 8N1).  Then, boot the debugger's OS by running
+\verb+nios2-download -C N -g core/projects/de2_70_debugger/zImage+
+where N is the JTAG cable number (see output from \verb+jtagconfig+).  If
+everything went right, it should boot a uClinux-based OS and drop you to a
+shell. Then, you need to run commands similar to the following (adjust as
+needed to fit your network setup):
+
+\begin{verbatim}
+ifconfig eth0 hw ether 00:07:ed:0a:03:29
+ifconfig eth0 192.168.1.80 netmask 255.255.255.0
+passwd
+\end{verbatim}
+
+The DE2-70 runs an ssh daemon, so after you've set the root password you can
+log into it remotely. Use \verb+scp+ to copy the following files onto the
+DE2-70 board's ramdisk:
+
+\begin{verbatim}
+core/boot/boot_ram.elf
+core/projects/de2_115_smp/kobj/vmlinux
+\end{verbatim}
+
+You will want to connect a second straight-through DB9 serial cable to the
+DE2-115's serial port at this point so that you have access to the target's
+local console. The serial parameters are the same as the debugger (115200 8N1).
+You could just swap the cable over from the DE2-70 since you probably don't
+need its console anymore, but it's convenient if your host has 2 serial ports
+to just connect both.
+
+Now you can use the \verb+z48d+ debugger program on the DE2-70 to connect to
+the DE2-115 to load and boot the kernel. The commands to do this are:
+
+\begin{verbatim}
+$ z48d -n x
+l
+boot_ram.elf
+l
+vmlinux
+R
+r
+Q
+\end{verbatim}
+(In order, these mean: start z48d, load, bootloader ELF image, load, kernel ELF
+image, reset, run, quit)
+
+If everything went perfectly, the Z4800 target should boot Linux with NFS-root.
+Good luck!
